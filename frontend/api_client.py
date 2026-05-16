@@ -39,14 +39,34 @@ def register_user(name, email, password):
     except requests.exceptions.RequestException:
         return False, "Connection error. Make sure the API is running."
 
+def _handle_error(response, context=""):
+    if response.status_code == 401:
+        st.error("Sesión expirada. Por favor, cierra sesión e inicia de nuevo.")
+    elif response.status_code == 403:
+        st.error("No tienes permiso para realizar esta acción.")
+    elif response.status_code == 404:
+        st.error(f"Recurso no encontrado. {context}")
+    elif response.status_code >= 500:
+        st.error(f"Error interno del servidor ({response.status_code}). Revisa que el backend esté corriendo correctamente.")
+    else:
+        detail = response.json().get("detail", "") if response.headers.get("content-type", "").startswith("application/json") else ""
+        st.error(f"Error inesperado ({response.status_code}). {detail}")
+
+def _handle_connection_error():
+    st.error("No se puede conectar al backend. Asegúrate de que está corriendo en http://localhost:8000")
+
 def get_todos():
     try:
         response = requests.get(f"{API_BASE_URL}/todos", headers=get_headers())
         if response.status_code == 200:
             return response.json()
+        _handle_error(response, "No se pudieron cargar las tareas.")
         return []
-    except requests.exceptions.RequestException:
-        st.error("Error fetching todos")
+    except requests.exceptions.ConnectionError:
+        _handle_connection_error()
+        return []
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error de conexión: {e}")
         return []
 
 def create_todo(title, description=""):
@@ -56,8 +76,15 @@ def create_todo(title, description=""):
             json={"title": title, "description": description, "completed": False},
             headers=get_headers()
         )
-        return response.status_code == 200
-    except requests.exceptions.RequestException:
+        if response.status_code == 200:
+            return True
+        _handle_error(response, "No se pudo crear la tarea.")
+        return False
+    except requests.exceptions.ConnectionError:
+        _handle_connection_error()
+        return False
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error de conexión: {e}")
         return False
 
 def update_todo(todo_id, title, description, completed):
@@ -67,15 +94,29 @@ def update_todo(todo_id, title, description, completed):
             json={"title": title, "description": description, "completed": completed},
             headers=get_headers()
         )
-        return response.status_code == 200
-    except requests.exceptions.RequestException:
+        if response.status_code == 200:
+            return True
+        _handle_error(response, "No se pudo actualizar la tarea.")
+        return False
+    except requests.exceptions.ConnectionError:
+        _handle_connection_error()
+        return False
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error de conexión: {e}")
         return False
 
 def delete_todo(todo_id):
     try:
         response = requests.delete(f"{API_BASE_URL}/todos/{todo_id}", headers=get_headers())
-        return response.status_code == 200
-    except requests.exceptions.RequestException:
+        if response.status_code == 200:
+            return True
+        _handle_error(response, "No se pudo eliminar la tarea.")
+        return False
+    except requests.exceptions.ConnectionError:
+        _handle_connection_error()
+        return False
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error de conexión: {e}")
         return False
 
 def get_user_profile():
@@ -83,6 +124,11 @@ def get_user_profile():
         response = requests.get(f"{API_BASE_URL}/profile", headers=get_headers())
         if response.status_code == 200:
             return response.json()
+        _handle_error(response, "No se pudo cargar el perfil.")
         return None
-    except requests.exceptions.RequestException:
+    except requests.exceptions.ConnectionError:
+        _handle_connection_error()
+        return None
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error de conexión: {e}")
         return None

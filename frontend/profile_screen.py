@@ -4,9 +4,10 @@ from api_client import get_user_profile, get_todos
 def profile_screen():
     st.title("👤 User Profile")
     
+    profile_data = get_user_profile()
+
     col1, col2 = st.columns([3, 1])
     with col1:
-        profile_data = get_user_profile()
         display_name = profile_data['name'] if profile_data else st.session_state.user_email
         st.write(f"Welcome to your profile, {display_name}!")
     with col2:
@@ -15,17 +16,16 @@ def profile_screen():
             st.session_state.token = None
             st.session_state.user_email = None
             st.rerun()
-    
+
     st.divider()
-    
-    profile_data = get_user_profile()
+
     if profile_data:
         st.subheader("Profile Information")
         st.write(f"**Name:** {profile_data['name']}")
         st.write(f"**Email:** {profile_data['email']}")
         st.write(f"**User ID:** {profile_data['id']}")
     else:
-        st.error("Failed to load profile information")
+        st.warning("No se pudo mostrar la información del perfil.")
     
     st.divider()
     

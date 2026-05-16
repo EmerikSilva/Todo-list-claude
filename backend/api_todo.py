@@ -8,7 +8,7 @@ import uuid
 from api_user import verify_token
 
 router = APIRouter()
-DB_FILE = "../db/db.json"
+DB_FILE = os.path.join(os.path.dirname(__file__), "..", "db", "db.json")
 
 class Todo(BaseModel):
     title: str

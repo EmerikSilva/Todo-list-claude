@@ -16,7 +16,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 SECRET_KEY = "your-secret-key-here"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
-DB_FILE = "../db/db.json"
+DB_FILE = os.path.join(os.path.dirname(__file__), "..", "db", "db.json")
 
 class UserLogin(BaseModel):
     email: EmailStr
