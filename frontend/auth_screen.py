@@ -11,7 +11,7 @@ def login_register_screen():
                    background-clip:text;">
             TaskFlow
         </h1>
-        <p style="color:#64748b; font-size:1rem; margin-top:8px;">
+        <p style="color:var(--c-text2); font-size:1rem; margin-top:8px;">
             Organiza tu tiempo. Mide tu progreso. Logra más.
         </p>
     </div>

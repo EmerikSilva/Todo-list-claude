@@ -19,38 +19,32 @@ def time_progress_bar(todo):
     if est <= 0:
         return
 
-    est_sec = est * 3600
-    ratio = min(total_sec / est_sec, 1.0)
+    ratio = min(total_sec / (est * 3600), 1.0)
     pct = ratio * 100
 
     if ratio < 0.6:
-        color = "#10b981"
-        label = "En tiempo"
+        color, label = "#10b981", "En tiempo"
     elif ratio < 0.9:
-        color = "#f59e0b"
-        label = "Cerca del límite"
+        color, label = "#f59e0b", "Cerca del límite"
     elif ratio < 1.0:
-        color = "#ef4444"
-        label = "Por agotar"
+        color, label = "#ef4444", "Por agotar"
     else:
-        color = "#dc2626"
-        label = "Tiempo superado"
+        color, label = "#dc2626", "Tiempo superado"
 
-    logged_str = fmt_seconds(total_sec)
     est_str = f"{est}h" if est == int(est) else f"{est:.1f}h"
 
     st.markdown(f"""
-    <div style="margin: 8px 0 4px 0;">
+    <div style="margin:8px 0 4px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-            <span style="font-size:0.82rem; color:#64748b; font-weight:500;">
-                ⏱ {logged_str} registradas de {est_str} estimadas
+            <span style="font-size:0.82rem; color:var(--c-text2); font-weight:500;">
+                ⏱ {fmt_seconds(total_sec)} registradas de {est_str} estimadas
             </span>
             <span style="font-size:0.78rem; font-weight:700; color:{color};
-                         background:{color}18; padding:2px 8px; border-radius:99px;">
+                         background:{color}22; padding:2px 8px; border-radius:99px;">
                 {label} · {pct:.0f}%
             </span>
         </div>
-        <div style="background:#e2e8f0; border-radius:99px; height:8px; overflow:hidden;">
+        <div style="background:var(--c-track); border-radius:99px; height:8px; overflow:hidden;">
             <div style="background:{color}; width:{pct:.1f}%; height:100%;
                         border-radius:99px; transition:width 0.4s ease;"></div>
         </div>
@@ -60,12 +54,11 @@ def time_progress_bar(todo):
 def live_timer(start_time: datetime):
     elapsed = int((datetime.now() - start_time).total_seconds())
     components.html(f"""
-    <div style="font-family:'Inter',sans-serif; display:flex; align-items:center; gap:10px;
-                background:linear-gradient(135deg,#6366f110,#8b5cf610);
-                border:1.5px solid #6366f130; border-radius:12px;
-                padding:10px 18px; width:fit-content;">
-        <span style="font-size:1.5rem;">⏱</span>
-        <span id="t" style="font-size:1.6rem; font-weight:700; color:#6366f1;
+    <div style="font-family:'Inter',sans-serif; display:inline-flex; align-items:center; gap:10px;
+                background:rgba(99,102,241,0.12); border:1.5px solid rgba(99,102,241,0.3);
+                border-radius:12px; padding:10px 18px;">
+        <span style="font-size:1.4rem;">⏱</span>
+        <span id="t" style="font-size:1.5rem; font-weight:700; color:#6366f1;
                              letter-spacing:0.04em;">--:--</span>
     </div>
     <script>
@@ -80,7 +73,7 @@ def live_timer(start_time: datetime):
         tick();
         setInterval(tick, 1000);
     </script>
-    """, height=64)
+    """, height=60)
 
 def todo_card(todo):
     tid = todo["id"]
@@ -88,23 +81,30 @@ def todo_card(todo):
     active = st.session_state.active_timer
     is_timing = active is not None and active["todo_id"] == tid
 
-    border_color = "#10b981" if is_done else ("#6366f1" if is_timing else "#e2e8f0")
-    bg = "#f0fdf4" if is_done else ("white")
-    opacity = "0.65" if is_done else "1"
+    if is_timing:
+        border_color = "#6366f1"
+    elif is_done:
+        border_color = "#10b981"
+    else:
+        border_color = "var(--c-border)"
+
+    bg = "var(--c-done)" if is_done else "var(--c-card)"
+    text_color = "var(--c-text3)" if is_done else "var(--c-text)"
+    text_deco = "line-through" if is_done else "none"
+    icon = "✅" if is_done else ("🔵" if is_timing else "📋")
 
     st.markdown(f"""
     <div style="background:{bg}; border-radius:16px; border:1.5px solid {border_color};
-                box-shadow:0 2px 16px rgba(0,0,0,0.06); padding:20px 24px 8px 24px;
-                margin-bottom:4px; opacity:{opacity}; position:relative;">
+                box-shadow:0 2px 16px rgba(0,0,0,0.07); padding:20px 24px 8px;
+                margin-bottom:4px;">
         <div style="display:flex; align-items:flex-start; gap:12px;">
-            <span style="font-size:1.3rem; margin-top:2px;">{"✅" if is_done else ("🔵" if is_timing else "📋")}</span>
+            <span style="font-size:1.25rem; margin-top:2px;">{icon}</span>
             <div style="flex:1;">
-                <p style="margin:0; font-size:1.05rem; font-weight:{"400" if is_done else "600"};
-                           color:#{"94a3b8" if is_done else "1e293b"};
-                           text-decoration:{"line-through" if is_done else "none"};">
-                    {todo["title"]}
+                <p style="margin:0; font-size:1.05rem; font-weight:{'400' if is_done else '600'};
+                           color:{text_color}; text-decoration:{text_deco};">
+                    {todo['title']}
                 </p>
-                {f'<p style="margin:4px 0 0 0; font-size:0.88rem; color:#64748b;">{todo["description"]}</p>' if todo.get("description") else ""}
+                {f'<p style="margin:4px 0 0; font-size:0.88rem; color:var(--c-text2);">{todo["description"]}</p>' if todo.get("description") else ""}
             </div>
         </div>
     </div>
@@ -118,39 +118,38 @@ def todo_card(todo):
     with col_timer:
         if is_timing:
             live_timer(active["start_time"])
-        elif not is_done and todo.get("total_seconds", 0) > 0:
+        elif todo.get("total_seconds", 0) > 0:
             st.markdown(
-                f'<span style="font-size:0.85rem; color:#64748b;">⏳ Total: <b>{fmt_seconds(todo["total_seconds"])}</b></span>',
-                unsafe_allow_html=True
+                f'<span style="font-size:0.85rem; color:var(--c-text2);">⏳ Total acumulado: <b style="color:var(--c-text);">{fmt_seconds(todo["total_seconds"])}</b></span>',
+                unsafe_allow_html=True,
             )
 
     with col_actions:
-        cols = st.columns(3 if not is_timing else 2)
-
         if is_timing:
-            with cols[0]:
+            c1, c2 = st.columns(2)
+            with c1:
                 if st.button("⏹ Detener", key=f"stop_{tid}"):
                     duration = (datetime.now() - active["start_time"]).total_seconds()
                     add_time_log(tid, duration)
                     st.session_state.active_timer = None
                     st.rerun()
-            with cols[1]:
-                toggle_label = "↩ Pendiente" if is_done else "✔ Completar"
-                if st.button(toggle_label, key=f"tog_{tid}"):
-                    update_todo(tid, todo["title"], todo.get("description"), not is_done, todo.get("estimated_hours"))
+            with c2:
+                if st.button("✔ Completar", key=f"tog_{tid}"):
+                    update_todo(tid, todo["title"], todo.get("description"), True, todo.get("estimated_hours"))
                     st.rerun()
         else:
-            with cols[0]:
+            c1, c2, c3 = st.columns(3)
+            with c1:
                 if not is_done:
                     if st.button("▶ Iniciar", key=f"start_{tid}"):
                         st.session_state.active_timer = {"todo_id": tid, "start_time": datetime.now()}
                         st.rerun()
-            with cols[1]:
-                toggle_label = "↩ Pendiente" if is_done else "✔ Completar"
-                if st.button(toggle_label, key=f"tog_{tid}"):
+            with c2:
+                label = "↩ Pendiente" if is_done else "✔ Completar"
+                if st.button(label, key=f"tog_{tid}"):
                     update_todo(tid, todo["title"], todo.get("description"), not is_done, todo.get("estimated_hours"))
                     st.rerun()
-            with cols[2]:
+            with c3:
                 if st.button("🗑", key=f"del_{tid}"):
                     delete_todo(tid)
                     if active and active["todo_id"] == tid:
@@ -162,8 +161,7 @@ def todo_card(todo):
             new_title = st.text_input("Título", value=todo["title"])
             new_desc = st.text_area("Descripción", value=todo.get("description") or "")
             new_est = st.number_input(
-                "Estimación (horas)",
-                min_value=0.0, step=0.5, format="%.1f",
+                "Estimación (horas)", min_value=0.0, step=0.5, format="%.1f",
                 value=float(todo.get("estimated_hours") or 0),
             )
             if st.form_submit_button("Guardar cambios"):
@@ -184,8 +182,8 @@ def todo_list_screen():
                    background-clip:text;">
             ⚡ TaskFlow
         </h1>
-        <p style="margin:4px 0 0 0; color:#64748b; font-size:1rem;">
-            Hola, <b>{name}</b>. Aquí están tus tareas de hoy.
+        <p style="margin:4px 0 0; color:var(--c-text2); font-size:1rem;">
+            Hola, <b style="color:var(--c-text);">{name}</b>. Aquí están tus tareas.
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -228,8 +226,8 @@ def todo_list_screen():
         st.markdown("""
         <div style="text-align:center; padding:3rem 1rem;">
             <div style="font-size:3rem; margin-bottom:1rem;">🎯</div>
-            <h3 style="color:#64748b; font-weight:600;">Sin tareas aún</h3>
-            <p style="color:#94a3b8;">Crea tu primera tarea arriba para empezar.</p>
+            <h3 style="color:var(--c-text2); font-weight:600;">Sin tareas aún</h3>
+            <p style="color:var(--c-text3);">Crea tu primera tarea arriba para empezar.</p>
         </div>
         """, unsafe_allow_html=True)
         return
@@ -238,11 +236,11 @@ def todo_list_screen():
     completed = [t for t in todos if t["completed"]]
 
     if pending:
-        st.markdown('<h3 style="color:#1e293b; font-weight:700; margin-bottom:1rem;">📋 Pendientes</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 style="color:var(--c-text); font-weight:700; margin-bottom:1rem;">📋 Pendientes</h3>', unsafe_allow_html=True)
         for todo in pending:
             todo_card(todo)
 
     if completed:
-        st.markdown('<h3 style="color:#64748b; font-weight:700; margin:1.5rem 0 1rem;">✅ Completadas</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 style="color:var(--c-text2); font-weight:700; margin:1.5rem 0 1rem;">✅ Completadas</h3>', unsafe_allow_html=True)
         for todo in completed:
             todo_card(todo)
