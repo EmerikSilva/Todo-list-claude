@@ -11,262 +11,307 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# JS inyectado en un iframe de altura 0.
+# Lee el color de fondo real del .stApp de Streamlit y pone
+# data-theme="light" | "dark" en el <html> del documento padre.
+# Esto es lo ÚNICO que controla el tema — sin @media (prefers-color-scheme).
+_THEME_DETECTOR_JS = """
+<script>
+(function () {
+    var INTERVAL = 900;   // ms entre comprobaciones
+    var lastTheme = null;
+
+    function detect() {
+        try {
+            var doc  = window.parent.document;
+            // Preferimos stAppViewContainer porque es el contenedor raíz real
+            var app  = doc.querySelector('[data-testid="stAppViewContainer"]')
+                    || doc.querySelector('.stApp');
+            if (!app) { setTimeout(detect, INTERVAL); return; }
+
+            var bg = window.parent.getComputedStyle(app).backgroundColor;
+            var m  = bg.match(/\d+/g);
+            if (!m || m.length < 3) { setTimeout(detect, INTERVAL); return; }
+
+            var brightness = (parseInt(m[0]) * 299
+                            + parseInt(m[1]) * 587
+                            + parseInt(m[2]) * 114) / 1000;
+
+            // Streamlit dark bg (rgb 14,17,23) → brightness ≈ 16
+            // Streamlit light bg (rgb 255,255,255) → brightness = 255
+            var theme = brightness < 100 ? 'dark' : 'light';
+
+            if (theme !== lastTheme) {
+                doc.documentElement.setAttribute('data-theme', theme);
+                lastTheme = theme;
+            }
+        } catch (e) { /* cross-origin guard */ }
+        setTimeout(detect, INTERVAL);
+    }
+
+    // Primer disparo inmediato, luego bucle
+    detect();
+})();
+</script>
+"""
+
 def inject_theme_detector():
-    """Detecta el tema real de Streamlit y pone data-theme en el <html>."""
-    components.html("""
-    <script>
-    (function() {
-        function detect() {
-            try {
-                var doc = window.parent.document;
-                var app = doc.querySelector('.stApp');
-                if (!app) { setTimeout(detect, 300); return; }
-                var rgb = window.parent.getComputedStyle(app).backgroundColor;
-                var m = rgb.match(/\d+/g);
-                if (!m) { setTimeout(detect, 300); return; }
-                var brightness = (parseInt(m[0])*299 + parseInt(m[1])*587 + parseInt(m[2])*114) / 1000;
-                doc.documentElement.setAttribute('data-theme', brightness < 100 ? 'dark' : 'light');
-            } catch(e) {}
-        }
-        detect();
-        setInterval(detect, 1500);
-    })();
-    </script>
-    """, height=0, scrolling=False)
+    components.html(_THEME_DETECTOR_JS, height=0, scrolling=False)
 
 def inject_css():
     st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
-    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 
-    /* ── Variables de color (modo claro) ── */
-    :root {
-        --c-card:    #ffffff;
-        --c-done:    #f0fdf4;
-        --c-text:    #1e293b;
-        --c-text2:   #64748b;
-        --c-text3:   #94a3b8;
-        --c-border:  #e2e8f0;
-        --c-track:   #e2e8f0;
-        --c-input:   #ffffff;
-        --c-expander:#ffffff;
-        --c-metric:  #ffffff;
-    }
+/* ═══════════════════════════════════════════════════════
+   VARIABLES — modo CLARO (valores por defecto en :root)
+   ══════════════════════════════════════════════════════ */
+:root {
+    --c-card:     #ffffff;
+    --c-done:     #f0fdf4;
+    --c-text:     #0f172a;   /* casi negro   — máximo contraste */
+    --c-text2:    #374151;   /* gris oscuro  — claramente legible */
+    --c-text3:    #4b5563;   /* gris medio   — legible */
+    --c-border:   #cbd5e1;
+    --c-track:    #e2e8f0;
+    --c-input:    #ffffff;
+    --c-metric:   #ffffff;
+    --c-expander: #ffffff;
+    --c-app-bg:   linear-gradient(135deg, #f0f4ff 0%, #faf5ff 100%);
+}
 
-    /* ── Variables de color (modo oscuro vía JS) ── */
-    [data-theme="dark"] {
-        --c-card:    #1e293b;
-        --c-done:    rgba(16,185,129,0.07);
-        --c-text:    #f1f5f9;
-        --c-text2:   #94a3b8;
-        --c-text3:   #64748b;
-        --c-border:  #334155;
-        --c-track:   #334155;
-        --c-input:   #1e293b;
-        --c-expander:#1e293b;
-        --c-metric:  #1e293b;
-    }
+/* ═══════════════════════════════════════════════════════
+   VARIABLES — modo OSCURO
+   Solo se activan cuando el JS pone data-theme="dark".
+   NO usamos @media (prefers-color-scheme) para evitar que
+   el OS dark mode choque con el tema claro de Streamlit.
+   ══════════════════════════════════════════════════════ */
+[data-theme="dark"] {
+    --c-card:     #1e293b;
+    --c-done:     rgba(16,185,129,0.08);
+    --c-text:     #f1f5f9;   /* casi blanco  — máximo contraste */
+    --c-text2:    #cbd5e1;   /* gris claro   — claramente legible */
+    --c-text3:    #94a3b8;   /* gris medio   — legible */
+    --c-border:   #334155;
+    --c-track:    #334155;
+    --c-input:    #263348;
+    --c-metric:   #1e293b;
+    --c-expander: #1e293b;
+    --c-app-bg:   linear-gradient(135deg, #0f172a 0%, #1a1340 100%);
+}
 
-    /* ── Variables (fallback via media query para OS dark) ── */
-    @media (prefers-color-scheme: dark) {
-        :root:not([data-theme="light"]) {
-            --c-card:    #1e293b;
-            --c-done:    rgba(16,185,129,0.07);
-            --c-text:    #f1f5f9;
-            --c-text2:   #94a3b8;
-            --c-text3:   #64748b;
-            --c-border:  #334155;
-            --c-track:   #334155;
-            --c-input:   #1e293b;
-            --c-expander:#1e293b;
-            --c-metric:  #1e293b;
-        }
-    }
+/* ═══════════════════════════════════════════════════════
+   APP BACKGROUND
+   ══════════════════════════════════════════════════════ */
+.stApp { background: var(--c-app-bg) !important; }
 
-    /* ── Background de la app ── */
-    [data-theme="light"] .stApp,
-    :root:not([data-theme="dark"]) .stApp {
-        background: linear-gradient(135deg, #f0f4ff 0%, #faf5ff 100%);
-    }
-    [data-theme="dark"] .stApp {
-        background: linear-gradient(135deg, #0f172a 0%, #1a1340 100%) !important;
-    }
+/* ── Main block ── */
+.main .block-container {
+    padding: 2rem 2.5rem 3rem 2.5rem;
+    max-width: 960px;
+}
 
-    /* ── Main block ── */
-    .main .block-container {
-        padding: 2rem 2.5rem 3rem 2.5rem;
-        max-width: 960px;
-    }
+/* ═══════════════════════════════════════════════════════
+   SIDEBAR — gradiente fijo (siempre legible en ambos modos)
+   ══════════════════════════════════════════════════════ */
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #4f46e5 0%, #7c3aed 100%);
+    border-right: none;
+}
+section[data-testid="stSidebar"] * {
+    color: rgba(255,255,255,0.92) !important;
+}
+section[data-testid="stSidebar"] .stSelectbox label,
+section[data-testid="stSidebar"] .stMarkdown p {
+    color: rgba(255,255,255,0.72) !important;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 600;
+}
+section[data-testid="stSidebar"] [data-baseweb="select"] {
+    background: rgba(255,255,255,0.15) !important;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.25) !important;
+}
+section[data-testid="stSidebar"] [data-baseweb="select"] * {
+    background: transparent !important;
+}
 
-    /* ── Sidebar ── */
-    section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #4f46e5 0%, #7c3aed 100%);
-        border-right: none;
-    }
-    section[data-testid="stSidebar"] * { color: rgba(255,255,255,0.9) !important; }
-    section[data-testid="stSidebar"] .stSelectbox label,
-    section[data-testid="stSidebar"] .stMarkdown p {
-        color: rgba(255,255,255,0.75) !important;
-        font-size: 0.85rem;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        font-weight: 600;
-    }
-    section[data-testid="stSidebar"] [data-baseweb="select"] {
-        background: rgba(255,255,255,0.15) !important;
-        border-radius: 10px;
-        border: 1px solid rgba(255,255,255,0.2) !important;
-    }
-    section[data-testid="stSidebar"] [data-baseweb="select"] * {
-        background: transparent !important;
-    }
+/* ═══════════════════════════════════════════════════════
+   BOTONES
+   ══════════════════════════════════════════════════════ */
+.stButton > button {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #ffffff !important;
+    border: none;
+    border-radius: 10px;
+    padding: 0.5rem 1.4rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(99,102,241,0.3);
+}
+.stButton > button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(99,102,241,0.45);
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+}
+.stButton > button:active { transform: translateY(0); }
 
-    /* ── Botones principales ── */
-    .stButton > button {
-        background: linear-gradient(135deg, #6366f1, #8b5cf6);
-        color: white !important;
-        border: none;
-        border-radius: 10px;
-        padding: 0.5rem 1.4rem;
-        font-weight: 600;
-        font-size: 0.9rem;
-        transition: all 0.2s ease;
-        box-shadow: 0 2px 8px rgba(99,102,241,0.3);
-    }
-    .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(99,102,241,0.45);
-        background: linear-gradient(135deg, #4f46e5, #7c3aed);
-    }
-    .stButton > button:active { transform: translateY(0px); }
+.stFormSubmitButton > button {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 10px !important;
+    padding: 0.6rem 2rem !important;
+    font-weight: 700 !important;
+    font-size: 0.95rem !important;
+    width: 100%;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 2px 8px rgba(99,102,241,0.3) !important;
+}
+.stFormSubmitButton > button:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(99,102,241,0.45) !important;
+}
 
-    /* ── Form submit ── */
-    .stFormSubmitButton > button {
-        background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
-        color: white !important;
-        border: none !important;
-        border-radius: 10px !important;
-        padding: 0.6rem 2rem !important;
-        font-weight: 700 !important;
-        font-size: 0.95rem !important;
-        width: 100%;
-        transition: all 0.2s ease !important;
-        box-shadow: 0 2px 8px rgba(99,102,241,0.3) !important;
-    }
-    .stFormSubmitButton > button:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 6px 20px rgba(99,102,241,0.45) !important;
-    }
+/* ═══════════════════════════════════════════════════════
+   INPUTS (usan variables para adaptarse al tema)
+   ══════════════════════════════════════════════════════ */
+.stTextInput > div > div > input,
+.stTextArea > div > div > textarea,
+.stNumberInput > div > div > input {
+    border-radius: 10px !important;
+    border: 2px solid var(--c-border) !important;
+    background: var(--c-input) !important;
+    color: var(--c-text) !important;
+    padding: 0.6rem 1rem !important;
+    font-size: 0.95rem !important;
+    transition: border-color 0.2s, box-shadow 0.2s !important;
+}
+.stTextInput > div > div > input:focus,
+.stTextArea > div > div > textarea:focus,
+.stNumberInput > div > div > input:focus {
+    border-color: #6366f1 !important;
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.15) !important;
+    outline: none !important;
+}
+/* Labels de inputs */
+.stTextInput label, .stTextArea label,
+.stNumberInput label, .stSelectbox label {
+    color: var(--c-text2) !important;
+    font-weight: 500 !important;
+}
 
-    /* ── Inputs ── */
-    .stTextInput > div > div > input,
-    .stTextArea > div > div > textarea,
-    .stNumberInput > div > div > input {
-        border-radius: 10px !important;
-        border: 2px solid var(--c-border) !important;
-        background: var(--c-input) !important;
-        color: var(--c-text) !important;
-        padding: 0.6rem 1rem !important;
-        font-size: 0.95rem !important;
-        transition: border-color 0.2s, box-shadow 0.2s !important;
-    }
-    .stTextInput > div > div > input:focus,
-    .stTextArea > div > div > textarea:focus,
-    .stNumberInput > div > div > input:focus {
-        border-color: #6366f1 !important;
-        box-shadow: 0 0 0 3px rgba(99,102,241,0.12) !important;
-    }
+/* ═══════════════════════════════════════════════════════
+   SELECTBOX
+   ══════════════════════════════════════════════════════ */
+[data-baseweb="select"] > div {
+    border-radius: 10px !important;
+    border: 2px solid var(--c-border) !important;
+    background: var(--c-input) !important;
+    color: var(--c-text) !important;
+}
 
-    /* ── Selectbox ── */
-    [data-baseweb="select"] > div {
-        border-radius: 10px !important;
-        border: 2px solid var(--c-border) !important;
-        background: var(--c-input) !important;
-    }
+/* ═══════════════════════════════════════════════════════
+   PROGRESS BAR
+   ══════════════════════════════════════════════════════ */
+.stProgress > div > div > div > div {
+    background: linear-gradient(90deg, #6366f1, #8b5cf6, #ec4899);
+    border-radius: 99px;
+}
+.stProgress > div > div {
+    border-radius: 99px;
+    background: var(--c-track);
+    height: 10px !important;
+}
 
-    /* ── Progress bar ── */
-    .stProgress > div > div > div > div {
-        background: linear-gradient(90deg, #6366f1, #8b5cf6, #ec4899);
-        border-radius: 99px;
-    }
-    .stProgress > div > div {
-        border-radius: 99px;
-        background: var(--c-track);
-        height: 10px !important;
-    }
+/* ═══════════════════════════════════════════════════════
+   METRICS
+   ══════════════════════════════════════════════════════ */
+[data-testid="metric-container"] {
+    background: var(--c-metric) !important;
+    border-radius: 16px;
+    padding: 1.2rem 1.5rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+    border: 1px solid var(--c-border);
+}
+[data-testid="metric-container"] label {
+    color: var(--c-text2) !important;
+    font-size: 0.8rem !important;
+    font-weight: 600 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+[data-testid="metric-container"] [data-testid="stMetricValue"] {
+    color: var(--c-text) !important;
+    font-size: 2rem !important;
+    font-weight: 700 !important;
+}
 
-    /* ── Metrics ── */
-    [data-testid="metric-container"] {
-        background: var(--c-metric);
-        border-radius: 16px;
-        padding: 1.2rem 1.5rem;
-        box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-        border: 1px solid var(--c-border);
-    }
-    [data-testid="metric-container"] label {
-        color: var(--c-text2) !important;
-        font-size: 0.8rem !important;
-        font-weight: 600 !important;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-    }
-    [data-testid="metric-container"] [data-testid="stMetricValue"] {
-        color: var(--c-text) !important;
-        font-size: 2rem !important;
-        font-weight: 700 !important;
-    }
+/* ═══════════════════════════════════════════════════════
+   ALERTS
+   ══════════════════════════════════════════════════════ */
+.stSuccess, .stInfo, .stWarning, .stError,
+[data-testid="stAlert"] {
+    border-radius: 10px !important;
+    border: none !important;
+}
 
-    /* ── Alerts ── */
-    .stSuccess, .stInfo, .stWarning, .stError {
-        border-radius: 10px !important;
-        border: none !important;
-    }
+/* ═══════════════════════════════════════════════════════
+   EXPANDER
+   ══════════════════════════════════════════════════════ */
+.stExpander {
+    background: var(--c-expander) !important;
+    border-radius: 14px !important;
+    border: 1px solid var(--c-border) !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    overflow: hidden;
+}
+.stExpander > details > summary {
+    font-weight: 600 !important;
+    color: var(--c-text) !important;
+    padding: 1rem 1.2rem !important;
+}
 
-    /* ── Expander ── */
-    .stExpander {
-        background: var(--c-expander) !important;
-        border-radius: 14px !important;
-        border: 1px solid var(--c-border) !important;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-        overflow: hidden;
-    }
-    .stExpander > details > summary {
-        font-weight: 600 !important;
-        color: var(--c-text) !important;
-        padding: 1rem 1.2rem !important;
-    }
+/* ═══════════════════════════════════════════════════════
+   DIVIDER
+   ══════════════════════════════════════════════════════ */
+hr { border-color: var(--c-border) !important; margin: 1.2rem 0 !important; }
 
-    /* ── Divider ── */
-    hr { border-color: var(--c-border) !important; margin: 1.2rem 0 !important; }
+/* ═══════════════════════════════════════════════════════
+   TABS
+   ══════════════════════════════════════════════════════ */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 8px;
+    background: rgba(99,102,241,0.08);
+    border-radius: 12px;
+    padding: 4px;
+}
+.stTabs [data-baseweb="tab"] {
+    border-radius: 9px;
+    padding: 0.5rem 1.5rem;
+    font-weight: 600;
+    color: var(--c-text2);
+    background: transparent;
+}
+.stTabs [aria-selected="true"] {
+    background: var(--c-card) !important;
+    color: #6366f1 !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
 
-    /* ── Tabs ── */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        background: rgba(99,102,241,0.07);
-        border-radius: 12px;
-        padding: 4px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        border-radius: 9px;
-        padding: 0.5rem 1.5rem;
-        font-weight: 600;
-        color: var(--c-text2);
-    }
-    .stTabs [aria-selected="true"] {
-        background: var(--c-card) !important;
-        color: #6366f1 !important;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    }
-
-    /* ── Checkbox ── */
-    .stCheckbox label span { font-weight: 500; color: var(--c-text); }
-
-    /* ── Labels generales ── */
-    label, .stMarkdown p { color: var(--c-text2); }
-    </style>
-    """, unsafe_allow_html=True)
+/* ═══════════════════════════════════════════════════════
+   CHECKBOX / texto general
+   ══════════════════════════════════════════════════════ */
+.stCheckbox label span,
+label,
+p { color: var(--c-text2); }
+</style>
+""", unsafe_allow_html=True)
 
 def init_session_state():
     defaults = {
