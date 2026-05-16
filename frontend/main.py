@@ -141,8 +141,28 @@ section[data-testid="stSidebar"] [data-baseweb="select"] * {
 }
 
 /* ═══════════════════════════════════════════════════════
-   BOTONES
+   BOTONES — primarios (gradiente)
    ══════════════════════════════════════════════════════ */
+.stButton > button[kind="primary"],
+[data-testid="baseButton-primary"] {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 10px !important;
+    padding: 0.5rem 1.4rem !important;
+    font-weight: 600 !important;
+    font-size: 0.9rem !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 2px 8px rgba(99,102,241,0.3) !important;
+}
+[data-testid="baseButton-primary"]:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(99,102,241,0.45) !important;
+    background: linear-gradient(135deg, #4f46e5, #7c3aed) !important;
+}
+[data-testid="baseButton-primary"]:active { transform: translateY(0) !important; }
+
+/* Fallback: cualquier botón sin kind explícito */
 .stButton > button {
     background: linear-gradient(135deg, #6366f1, #8b5cf6);
     color: #ffffff !important;
@@ -160,6 +180,21 @@ section[data-testid="stSidebar"] [data-baseweb="select"] * {
     background: linear-gradient(135deg, #4f46e5, #7c3aed);
 }
 .stButton > button:active { transform: translateY(0); }
+
+/* Botones secundarios — estilo ghost */
+[data-testid="baseButton-secondary"] {
+    background: transparent !important;
+    color: var(--c-text2) !important;
+    border: 1.5px solid var(--c-border) !important;
+    box-shadow: none !important;
+}
+[data-testid="baseButton-secondary"]:hover {
+    background: rgba(99,102,241,0.08) !important;
+    border-color: #6366f1 !important;
+    color: #6366f1 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: none !important;
+}
 
 .stFormSubmitButton > button {
     background: linear-gradient(135deg, #6366f1, #8b5cf6) !important;
@@ -310,6 +345,38 @@ hr { border-color: var(--c-border) !important; margin: 1.2rem 0 !important; }
 .stCheckbox label span,
 label,
 p { color: var(--c-text2); }
+
+/* ═══════════════════════════════════════════════════════
+   TARJETAS (st.container border=True)
+   ══════════════════════════════════════════════════════ */
+[data-testid="stVerticalBlockBorderWrapper"] {
+    background: var(--c-card) !important;
+    border-radius: 16px !important;
+    border: 1px solid var(--c-border) !important;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    padding: 1.2rem 1.4rem !important;
+    margin-bottom: 0.75rem !important;
+    transition: box-shadow 0.2s, transform 0.2s;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:hover {
+    box-shadow: 0 6px 24px rgba(99,102,241,0.12);
+    transform: translateY(-1px);
+}
+
+/* ═══════════════════════════════════════════════════════
+   MODAL DE EDICIÓN (@st.dialog)
+   ══════════════════════════════════════════════════════ */
+[data-testid="stModal"] > div,
+[data-testid="stModal"] > div > div {
+    background: var(--c-card) !important;
+    border-radius: 20px !important;
+    border: 1px solid var(--c-border) !important;
+}
+/* Overlay backdrop */
+[data-testid="stModal"] {
+    background: rgba(0,0,0,0.5) !important;
+    backdrop-filter: blur(4px);
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -319,6 +386,8 @@ def init_session_state():
         "token": None,
         "user_email": None,
         "active_timer": None,
+        "editing_todo_id": None,
+        "_dialog_open": False,
     }
     for key, val in defaults.items():
         if key not in st.session_state:
@@ -339,8 +408,11 @@ def main():
             st.markdown("---")
             st.markdown(f"👤 **{st.session_state.user_email}**")
             if st.button("Cerrar sesión", key="sidebar_logout"):
-                for key in ["authenticated", "token", "user_email", "active_timer"]:
-                    st.session_state[key] = None if key != "authenticated" else False
+                for key in ["token", "user_email", "active_timer",
+                            "editing_todo_id"]:
+                    st.session_state[key] = None
+                st.session_state.authenticated = False
+                st.session_state._dialog_open = False
                 st.rerun()
 
         if page == "Mis Tareas":
